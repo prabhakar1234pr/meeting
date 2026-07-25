@@ -43,6 +43,63 @@ ngrok http 8000              # copy the https URL into PUBLIC_BASE_URL / PUBLIC_
 uvicorn app.api.main:app --reload --port 8000
 ```
 
+## Configuration & secrets
+
+All config comes from environment variables (loaded from `.env`, which is
+**git-ignored** — never commit real keys). Copy `.env.example` to `.env` and fill
+these in:
+
+| Variable | Required | What it is / where to get it |
+| --- | --- | --- |
+| `MEETSTREAM_API_KEY` | ✅ | MeetStream API key (joins the call, streams audio). app.meetstream.ai → API keys. |
+| `PUBLIC_BASE_URL` / `PUBLIC_WS_URL` | ✅ | Your public tunnel (`https://…` / `wss://…`) so MeetStream can reach your local webhooks + audio bridge. `ngrok http 8000`. |
+| `OPENAI_API_KEY` | ✅ | OpenAI key (the LLM: live responder, briefs, chat, tool-calling). |
+| `LLM_BASE_URL` | — | Optional. Point at any OpenAI-compatible endpoint to swap providers (e.g. Gemini). Leave unset for OpenAI. |
+| `VERTEX_API_KEY` / `GEMINI_API_KEY` | — | Google AI Studio key, used only when `LLM_BASE_URL` targets Gemini. |
+| `ELEVENLABS_API_KEY` | ✅ | ElevenLabs key (the voice / TTS). |
+| `SCALEKIT_ENVIRONMENT_URL` · `SCALEKIT_CLIENT_ID` · `SCALEKIT_CLIENT_SECRET` | ✅¹ | Scalekit credentials (identity: login, orgs, per-user connected accounts). app.scalekit.com → Developers → API Credentials. |
+| `AUTH_ENABLED` | — | `true` requires Scalekit login + an org; `false` (default) runs open as a single `local` user. |
+| `REDIS_URL` | — | Redis for the transcription bus (default `redis://localhost:6379/0`). |
+
+¹ Required only for the auth/actions layer; the core meeting flow runs without it
+when `AUTH_ENABLED=false`.
+
+### GitHub Actions secrets
+
+The same sensitive values are stored as **repository secrets** (Settings →
+Secrets and variables → Actions) so they never live in the code. Currently set:
+`MEETSTREAM_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`, `VERTEX_API_KEY`,
+`SCALEKIT_ENVIRONMENT_URL`, `SCALEKIT_CLIENT_ID`, `SCALEKIT_CLIENT_SECRET`.
+
+Add or rotate one with the GitHub CLI (the value is read from stdin, so it's
+never in your shell history):
+
+```bash
+printf '%s' "<new-value>" | gh secret set OPENAI_API_KEY --repo prabhakar1234pr/meeting
+gh secret list --repo prabhakar1234pr/meeting          # names + timestamps only
+```
+
+GitHub secrets are write-only — they're exposed only to Actions workflows via
+`${{ secrets.NAME }}`, never readable back. For **local** development you still
+need your own `.env`; the repo secrets are for CI/deploy. A workflow can rebuild
+`.env` from them, e.g.:
+
+```yaml
+- name: Write .env from secrets
+  run: |
+    cat > .env <<EOF
+    MEETSTREAM_API_KEY=${{ secrets.MEETSTREAM_API_KEY }}
+    OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+    ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}
+    SCALEKIT_ENVIRONMENT_URL=${{ secrets.SCALEKIT_ENVIRONMENT_URL }}
+    SCALEKIT_CLIENT_ID=${{ secrets.SCALEKIT_CLIENT_ID }}
+    SCALEKIT_CLIENT_SECRET=${{ secrets.SCALEKIT_CLIENT_SECRET }}
+    EOF
+```
+
+> Security note: these are live keys. If this repo is ever made public or shared
+> beyond the team, **rotate** the affected keys in each provider's dashboard.
+
 ## What's built
 
 - **Web UI** at `http://localhost:8000` — Knowledge, Agents, Create agent,
