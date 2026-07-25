@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data (SQLite, Chroma, Redis, transcripts, embeddings cache)
+data/
+.fastembed_cache/
+
+# Secrets
+.env
+gcp-service-account.json

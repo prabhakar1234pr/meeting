@@ -1,0 +1,29 @@
+# Web / infra
+fastapi==0.115.0
+# Pin starlette: the scalekit SDK pulls `mcp` which wants starlette>=1.x, but
+# FastAPI 0.115 needs <0.42. Pin the FastAPI-compatible version (install last).
+starlette==0.41.3
+uvicorn[standard]
+redis>=5
+python-dotenv
+pydantic>=2
+
+# LLM (OpenAI) + voice (ElevenLabs)
+openai
+elevenlabs
+
+# Local memory (fully offline)
+chromadb
+fastembed
+numpy
+
+# Ingestion + HTTP + file parsing
+httpx
+pypdf
+python-docx
+
+# MeetStream audio bridge
+websockets
+
+# Scalekit — auth (Full Stack Auth) + AgentKit actions
+scalekit-sdk-python

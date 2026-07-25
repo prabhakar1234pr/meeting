@@ -1,0 +1,14 @@
+{
+  "enabledPlugins": {
+    "agentkit@authstack": true,
+    "saaskit@authstack": true
+  },
+  "extraKnownMarketplaces": {
+    "authstack": {
+      "source": {
+        "source": "github",
+        "repo": "scalekit-inc/authstack"
+      }
+    }
+  }
+}

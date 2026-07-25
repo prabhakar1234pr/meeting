@@ -1,0 +1,9 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: teammate-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis:/data
