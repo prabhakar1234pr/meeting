@@ -24,36 +24,21 @@ log = logging.getLogger("teammate.tools")
 async def _github_create_issue(args: dict, identity: str) -> dict:
     repo = (args.get("repo") or config.GITHUB_DEFAULT_REPO or "").strip()
     if "/" not in repo:
-        return {"ok": False, "error": "Need a repo as 'owner/name' (or set GITHUB_DEFAULT_REPO)."}
-    token = await asyncio.to_thread(
-        scalekit_client.access_token, config.SCALEKIT_CONNECTION_GITHUB, identity,
+        return {"ok": False, "error": "Need a repo as 'owner/name'."}
+    owner, name = repo.split("/", 1)
+    tool_input = {"owner": owner, "repo": name, "title": args.get("title")}
+    for k in ("body", "labels", "assignees"):
+        if args.get(k):
+            tool_input[k] = args[k]
+    data = await asyncio.to_thread(
+        scalekit_client.execute_tool, "github_issue_create", tool_input,
+        identity, config.SCALEKIT_CONNECTION_GITHUB,
     )
-    payload = {
-        "title": args.get("title"),
-        "body": args.get("body"),
-        "labels": args.get("labels"),
-        "assignees": args.get("assignees"),
-    }
-    payload = {k: v for k, v in payload.items() if v}
-
-    def _call():
-        return requests.post(
-            f"https://api.github.com/repos/{repo}/issues",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/vnd.github+json",
-            },
-            json=payload,
-            timeout=20,
-        )
-
-    r = await asyncio.to_thread(_call)
-    if r.status_code >= 300:
-        return {"ok": False, "error": f"GitHub {r.status_code}: {r.text[:300]}"}
-    data = r.json()
+    num = data.get("number")
+    num = int(num) if isinstance(num, (int, float)) else num
     return {
         "ok": True,
-        "summary": f"Created issue #{data.get('number')} in {repo}",
+        "summary": f"Created issue #{num} in {repo}",
         "url": data.get("html_url"),
     }
 
@@ -62,27 +47,13 @@ async def _gmail_send_email(args: dict, identity: str) -> dict:
     to = (args.get("to") or "").strip()
     if not to:
         return {"ok": False, "error": "Need a recipient email address."}
-    token = await asyncio.to_thread(
-        scalekit_client.access_token, config.SCALEKIT_CONNECTION_GMAIL, identity,
+    tool_input = {"to": to, "subject": args.get("subject", ""), "body": args.get("body", "")}
+    data = await asyncio.to_thread(
+        scalekit_client.execute_tool, "gmail_send_message", tool_input,
+        identity, config.SCALEKIT_CONNECTION_GMAIL,
     )
-    msg = EmailMessage()
-    msg["To"] = to
-    msg["Subject"] = args.get("subject", "")
-    msg.set_content(args.get("body", ""))
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-
-    def _call():
-        return requests.post(
-            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-            headers={"Authorization": f"Bearer {token}"},
-            json={"raw": raw},
-            timeout=20,
-        )
-
-    r = await asyncio.to_thread(_call)
-    if r.status_code >= 300:
-        return {"ok": False, "error": f"Gmail {r.status_code}: {r.text[:300]}"}
-    return {"ok": True, "summary": f"Email sent to {to}"}
+    mid = data.get("id") if isinstance(data, dict) else None
+    return {"ok": True, "summary": f"Email sent to {to}", "id": mid}
 
 
 # ─── registry ─────────────────────────────────────────────────
@@ -166,6 +137,8 @@ async def execute(name: str, args: dict, identity: str) -> dict:
         return {"ok": False, "error": f"Unknown tool: {name}"}
     try:
         return await tool["execute"](args, identity)
+    except scalekit_client.ReauthRequired as e:
+        return {"ok": False, "error": str(e), "reauth": True}
     except scalekit_client.ScalekitNotConfigured as e:
         return {"ok": False, "error": str(e)}
     except Exception as e:  # noqa: BLE001 — surface any executor failure to the UI

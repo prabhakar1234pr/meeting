@@ -3,7 +3,9 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=True so .env is authoritative: a stale value left in the shell
+# environment (e.g. an old OPENAI_API_KEY) can't silently shadow the file.
+load_dotenv(override=True)
 
 
 def _get(key: str, default=None):

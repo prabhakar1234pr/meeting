@@ -24,6 +24,11 @@ class ScalekitNotConfigured(RuntimeError):
     clear 'connect your account' message instead of a 500."""
 
 
+class ReauthRequired(RuntimeError):
+    """A connected account's token expired or was revoked (common with Google,
+    whose access tokens are short-lived). The user must reconnect the account."""
+
+
 def configured() -> bool:
     return bool(
         config.SCALEKIT_CLIENT_ID
@@ -119,3 +124,32 @@ def access_token(connection_name: str, identifier: str) -> str:
             "Authorize the connection first."
         )
     return at
+
+
+def execute_tool(tool_name: str, tool_input: dict, identifier: str,
+                 connection_name: str) -> dict:
+    """Run an AgentKit tool server-side AS `identifier`, and return its `data`.
+
+    This SDK version never hands back the raw OAuth token (`authorization_details`
+    is empty) — Scalekit keeps the scoped token, makes the third-party API call
+    itself, and returns the result. So actions go through here, not a local
+    `requests` call with a fetched token."""
+    try:
+        resp = _actions().execute_tool(
+            tool_name=tool_name,
+            tool_input=tool_input,
+            identifier=identifier,
+            connection_name=connection_name,
+        )
+    except (ScalekitNotConfigured, ReauthRequired):
+        raise
+    except Exception as e:  # noqa: BLE001
+        m = str(e).lower()
+        if "reauthentication" in m or "token expired" in m or "unauthenticated" in m:
+            raise ReauthRequired(
+                f"Your '{connection_name}' connection expired. Reconnect it on the "
+                "Connections page (Reauthorize), then try again."
+            ) from e
+        raise
+    d = resp.model_dump() if hasattr(resp, "model_dump") else resp
+    return d.get("data", d) if isinstance(d, dict) else {"result": d}

@@ -207,12 +207,18 @@ class Responder:
     def _action_system(self, roster, speaker):
         name = self.agent.get("name") or "the assistant"
         who = f"The person who just spoke is {speaker}. " if speaker else ""
-        r = ("\n\nTeammates (name <email>) — resolve any name or 'me' to one of these:\n- "
+        r = ("\n\nTeammates (name <email>) — resolve a name or 'me' to one of these:\n- "
              + "\n- ".join(roster)) if roster else ""
-        return (f"You are {name}, a teammate in a live meeting who can take real actions for "
-                f"the team using the provided tools. {who}Call a tool ONLY when someone clearly "
-                "asks you to do something it covers (send an email, file a GitHub issue). Fill "
-                "every required field; resolve a recipient name or 'me' to an email below." + r)
+        return (
+            f"You are {name}, a teammate in a live meeting who can take REAL actions for the team "
+            f"using the provided tools. {who}"
+            "WHEN: call a tool only when someone clearly asks you to DO something it covers "
+            "(send an email, file a GitHub issue). If they are just asking a question or talking, "
+            "do NOT call a tool. HOW: fill every required field — for an email set the recipient "
+            "(resolve a name or 'me' from the list below) plus a clear subject and body; for a "
+            "GitHub issue set 'repo' as 'owner/name', a specific title, and a useful body. Never "
+            "invent a recipient or repo that isn't grounded in the conversation or the list." + r
+        )
 
     async def _propose(self, query, speaker, identity, tenant, specs) -> bool:
         """Ask the model whether this turn is an action. If so, stash it and ask

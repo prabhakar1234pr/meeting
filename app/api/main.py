@@ -567,15 +567,29 @@ async def chat(body: ChatIn, user: dict = Depends(auth.require_org)):
     specs = tools.specs_for(active)
     if specs:
         system += (
-            "\n\nYou can take actions with the available tools. Call one ONLY when the user "
-            "clearly asks you to do something (file an issue, send an email). The user confirms "
-            "before anything runs, so propose the action when it's warranted; otherwise just answer."
+            "\n\n## Taking actions\n"
+            "You have tools that perform REAL actions (send an email, create a GitHub issue). "
+            "A human confirms before anything runs, so propose confidently when it's warranted.\n"
+            "WHEN to call a tool:\n"
+            "- Only when the user clearly asks you to DO the thing (\"email …\", \"send …\", "
+            "\"file/open/create an issue\", \"make a ticket\"). A request to explain, summarise, "
+            "look something up, or just chat is NOT an action — answer those with text.\n"
+            "- One action per message: pick the single most relevant tool.\n"
+            "- If a required field is missing and you can't infer it from the conversation, the "
+            "person you're talking to, or the roster, ask one short question instead of guessing.\n"
+            "HOW to fill the arguments:\n"
+            "- Email (gmail_send_email): resolve the recipient from a name or 'me' using the roster; "
+            "write a clear, complete subject and body — never blanks or placeholders.\n"
+            "- GitHub issue (github_create_issue): set 'repo' to 'owner/name' (prefer a connected "
+            "repo listed below); write a specific title and a useful Markdown body (context, plus "
+            "repro/acceptance if it's a bug or task).\n"
+            "- Never invent a recipient or repo that isn't grounded in the conversation or the lists provided."
         )
         repos = _github_repos_for_agent(agent)
         if repos:
             system += (
-                "\n\nFor GitHub issues, file into a repository this agent already has context on: "
-                f"{', '.join(repos)}. Set the tool's 'repo' to the most relevant 'owner/name'."
+                "\n\nGitHub repositories this agent has context on (use one of these as 'repo'): "
+                f"{', '.join(repos)}."
             )
         result = await llm.acomplete_with_tools(system, body.message, specs, model=config.LLM_BRIEF_MODEL)
         if result["tool_calls"]:
